@@ -7,10 +7,10 @@
       </button>
       <div class="window-controls no-app-region">
         <button title="最小化" @click="minimizeWindow">
-          <BaseIcon name="minimize" :size="12" />
+          <BaseIcon name="back" :size="12" />
         </button>
         <button title="最大化" @click="toggleMaximize">
-          <BaseIcon name="maximize" :size="12" />
+          <BaseIcon name="close" :size="12" />
         </button>
         <button class="close" title="关闭" @click="closeWindow">
           <BaseIcon name="close" :size="12" />
