@@ -1,5 +1,10 @@
 export {};
 
+declare module 'dplayer' {
+  const DPlayer: any;
+  export default DPlayer;
+}
+
 declare global {
   interface ElectronAPI {
     getAppInfo: () => Promise<{ version: string; platform: string }>;

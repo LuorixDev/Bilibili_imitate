@@ -1,2 +1,15 @@
-"use strict";var i=require("electron");i.contextBridge.exposeInMainWorld("electronAPI",{getAppInfo:()=>i.ipcRenderer.invoke("app:getInfo"),openExternal:e=>i.ipcRenderer.invoke("app:openExternal",e),windowMinimize:()=>i.ipcRenderer.invoke("window:minimize"),windowToggleMaximize:()=>i.ipcRenderer.invoke("window:toggleMaximize"),windowIsMaximized:()=>i.ipcRenderer.invoke("window:isMaximized"),windowClose:()=>i.ipcRenderer.invoke("window:close"),openVideoWindow:e=>i.ipcRenderer.invoke("window:openVideo",e),openLiveWindow:e=>i.ipcRenderer.invoke("window:openLive",e)});
+"use strict";
+
+// src/preload/index.ts
+var import_electron = require("electron");
+import_electron.contextBridge.exposeInMainWorld("electronAPI", {
+  getAppInfo: () => import_electron.ipcRenderer.invoke("app:getInfo"),
+  openExternal: (url) => import_electron.ipcRenderer.invoke("app:openExternal", url),
+  windowMinimize: () => import_electron.ipcRenderer.invoke("window:minimize"),
+  windowToggleMaximize: () => import_electron.ipcRenderer.invoke("window:toggleMaximize"),
+  windowIsMaximized: () => import_electron.ipcRenderer.invoke("window:isMaximized"),
+  windowClose: () => import_electron.ipcRenderer.invoke("window:close"),
+  openVideoWindow: (id) => import_electron.ipcRenderer.invoke("window:openVideo", id),
+  openLiveWindow: (id) => import_electron.ipcRenderer.invoke("window:openLive", id)
+});
 //# sourceMappingURL=preload.js.map

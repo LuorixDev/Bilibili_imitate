@@ -2,6 +2,6 @@
   "version": 3,
   "sources": ["../src/preload/index.ts"],
   "sourcesContent": ["import { contextBridge, ipcRenderer } from 'electron';\n\ncontextBridge.exposeInMainWorld('electronAPI', {\n  getAppInfo: () => ipcRenderer.invoke('app:getInfo'),\n  openExternal: (url: string) => ipcRenderer.invoke('app:openExternal', url),\n  windowMinimize: () => ipcRenderer.invoke('window:minimize'),\n  windowToggleMaximize: () => ipcRenderer.invoke('window:toggleMaximize'),\n  windowIsMaximized: () => ipcRenderer.invoke('window:isMaximized'),\n  windowClose: () => ipcRenderer.invoke('window:close'),\n  openVideoWindow: (id: string) => ipcRenderer.invoke('window:openVideo', id),\n  openLiveWindow: (id: string) => ipcRenderer.invoke('window:openLive', id),\n});\n"],
-  "mappings": "aAAA,IAAAA,EAA2C,oBAE3C,gBAAc,kBAAkB,cAAe,CAC7C,WAAY,IAAM,cAAY,OAAO,aAAa,EAClD,aAAeC,GAAgB,cAAY,OAAO,mBAAoBA,CAAG,EACzE,eAAgB,IAAM,cAAY,OAAO,iBAAiB,EAC1D,qBAAsB,IAAM,cAAY,OAAO,uBAAuB,EACtE,kBAAmB,IAAM,cAAY,OAAO,oBAAoB,EAChE,YAAa,IAAM,cAAY,OAAO,cAAc,EACpD,gBAAkBC,GAAe,cAAY,OAAO,mBAAoBA,CAAE,EAC1E,eAAiBA,GAAe,cAAY,OAAO,kBAAmBA,CAAE,CAC1E,CAAC",
-  "names": ["import_electron", "url", "id"]
+  "mappings": ";;;AAAA,sBAA2C;AAE3C,8BAAc,kBAAkB,eAAe;AAAA,EAC7C,YAAY,MAAM,4BAAY,OAAO,aAAa;AAAA,EAClD,cAAc,CAAC,QAAgB,4BAAY,OAAO,oBAAoB,GAAG;AAAA,EACzE,gBAAgB,MAAM,4BAAY,OAAO,iBAAiB;AAAA,EAC1D,sBAAsB,MAAM,4BAAY,OAAO,uBAAuB;AAAA,EACtE,mBAAmB,MAAM,4BAAY,OAAO,oBAAoB;AAAA,EAChE,aAAa,MAAM,4BAAY,OAAO,cAAc;AAAA,EACpD,iBAAiB,CAAC,OAAe,4BAAY,OAAO,oBAAoB,EAAE;AAAA,EAC1E,gBAAgB,CAAC,OAAe,4BAAY,OAAO,mBAAmB,EAAE;AAC1E,CAAC;",
+  "names": []
 }

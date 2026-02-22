@@ -35,11 +35,7 @@
               <div class="placeholder-subtitle">如果长时间无响应，请检查网络或稍后重试</div>
             </div>
           </div>
-          <div class="danmaku-bar" :class="{ disabled: !video }">
-            <input v-model="danmakuText" type="text" placeholder="发送一条弹幕" :disabled="!video" />
-            <button class="primary" :disabled="!video" @click="sendDanmaku">发送</button>
-          </div>
-        </div>
+      </div>
         <button
           class="right-close"
           :style="{
@@ -201,7 +197,6 @@ const commentTotal = ref(0);
 const commentLoading = ref(false);
 
 const danmaku = useDanmaku();
-const danmakuText = ref('');
 const playerRef = ref<{ getCurrentTime: () => number } | null>(null);
 let unsubscribe: (() => void) | null = null;
 const danmakuItems = computed(() => [...danmaku.active.value]);
@@ -252,14 +247,6 @@ const initDanmaku = async () => {
   unsubscribe = danmakuApi.subscribe(videoId.value, (item) => danmaku.push(item));
 };
 
-const sendDanmaku = async () => {
-  if (!videoId.value) return;
-  const value = danmakuText.value.trim();
-  if (!value) return;
-  const time = playerRef.value?.getCurrentTime?.() ?? 0;
-  await danmakuApi.send(videoId.value, value, userStore.profile?.id || 'guest', time);
-  danmakuText.value = '';
-};
 
 const init = async () => {
   if (!videoId.value) return;
@@ -401,33 +388,6 @@ const closeWindow = () => window.electronAPI?.windowClose?.();
   overflow: hidden;
   border-radius: var(--radius-md);
   background: #000;
-}
-
-.danmaku-bar {
-  position: absolute;
-  left: 14px;
-  right: 14px;
-  bottom: 16px;
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  background: rgba(15, 15, 17, 0.7);
-  padding: 8px 10px;
-  border-radius: var(--radius-sm);
-  backdrop-filter: blur(4px);
-}
-
-.danmaku-bar.disabled {
-  opacity: 0.6;
-}
-
-.danmaku-bar input {
-  flex: 1;
-  padding: 8px 10px;
-  border-radius: var(--radius-sm);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  background: rgba(255, 255, 255, 0.08);
-  color: #fff;
 }
 
 .right-close {
