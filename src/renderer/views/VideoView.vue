@@ -1,620 +1,842 @@
 <template>
-  <div class="video-view">
-    <!-- 视频播放区 -->
-    <div class="player-section">
-      <VideoPlayer
-        :src="video?.videoUrl || ''"
-        :danmaku-list="danmakuList"
-        :show-danmaku="true"
-        :auto-play="true"
-        @play="onPlay"
-        @timeupdate="onTimeUpdate"
-        @ended="onEnded"
-        ref="playerRef"
-      />
-    </div>
-    
-    <!-- 视频信息区 -->
-    <div class="info-section">
-      <div class="video-header">
-        <h1 class="video-title">{{ video?.title }}</h1>
-        <div class="video-stats">
-          <span class="stat-item">
-            <PlayCircleIcon class="icon" />
-            {{ formatNumber(video?.views || 0) }} 播放
-          </span>
-          <span class="stat-item">
-            <MessageSquareIcon class="icon" />
-            {{ formatNumber(video?.comments || 0) }} 弹幕
-          </span>
-          <span class="stat-item">
-            <ClockIcon class="icon" />
-            {{ video?.publishTime }}
-          </span>
-        </div>
-      </div>
-      
-      <div class="video-actions">
-        <button
-          class="action-btn"
-          :class="{ active: isLiked }"
-          @click="toggleLike"
-        >
-          <ThumbsUpIcon class="icon" />
-          <span>{{ formatNumber(video?.likes || 0) }}</span>
+  <div class="video-player">
+    <div class="video-header app-region">
+      <button class="gohome no-app-region" :style="{ marginLeft: goHomeMargin }" @click="goHome">
+        <BaseIcon name="home" :size="18" />
+        <span>回到主界面</span>
+      </button>
+      <div class="window-controls no-app-region">
+        <button title="最小化" @click="minimizeWindow">
+          <BaseIcon name="minimize" :size="12" />
         </button>
-        <button
-          class="action-btn"
-          :class="{ active: isCollected }"
-          @click="toggleCollect"
-        >
-          <StarIcon class="icon" />
-          <span>{{ formatNumber(video?.collects || 0) }}</span>
+        <button title="最大化" @click="toggleMaximize">
+          <BaseIcon name="maximize" :size="12" />
         </button>
-        <button
-          class="action-btn"
-          :class="{ active: isCoined }"
-          @click="toggleCoin"
-        >
-          <CoinsIcon class="icon" />
-          <span>{{ formatNumber(video?.coins || 0) }}</span>
+        <button class="close" title="关闭" @click="closeWindow">
+          <BaseIcon name="close" :size="12" />
         </button>
-        <button class="action-btn" @click="share">
-          <Share2Icon class="icon" />
-          <span>分享</span>
-        </button>
-      </div>
-      
-      <!-- UP主信息 -->
-      <div class="up-info" v-if="video">
-        <img :src="video.author?.avatar" class="up-avatar" @click="goToUser" />
-        <div class="up-meta">
-          <div class="up-name" @click="goToUser">{{ video.author?.name }}</div>
-          <div class="up-desc">{{ video.authorDesc || '这个人很懒，什么都没有写~' }}</div>
-        </div>
-        <button
-          class="follow-btn"
-          :class="{ followed: isFollowing }"
-          @click="toggleFollow"
-        >
-          {{ isFollowing ? '已关注' : '+ 关注' }}
-        </button>
-      </div>
-      
-      <!-- 视频简介 -->
-      <div class="video-desc">
-        <p>{{ video?.description || '暂无简介' }}</p>
-        <div class="video-tags">
-          <span v-for="tag in video?.tags" :key="tag" class="tag">{{ tag }}</span>
-        </div>
       </div>
     </div>
-    
-    <!-- 评论区 -->
-    <div class="comment-section">
-      <div class="comment-header">
-        <h3>评论 ({{ comments.length }})</h3>
-        <div class="comment-sort">
-          <span
-            :class="{ active: sortBy === 'hot' }"
-            @click="sortBy = 'hot'"
-          >最热</span>
-          <span
-            :class="{ active: sortBy === 'time' }"
-            @click="sortBy = 'time'"
-          >最新</span>
-        </div>
-      </div>
-      
-      <!-- 评论输入 -->
-      <div class="comment-input-area">
-        <img :src="userStore.userInfo?.avatar || '/default-avatar.png'" class="user-avatar" />
-        <div class="input-wrapper">
-          <textarea
-            v-model="commentText"
-            placeholder="发一条友善的评论~"
-            rows="3"
-          ></textarea>
-          <div class="input-actions">
-            <button class="submit-btn" @click="submitComment" :disabled="!commentText.trim()">
-              发表评论
-            </button>
+
+    <div class="video-layout">
+      <section class="video">
+        <div class="player-shell">
+          <VideoPlayer
+            v-if="video"
+            :key="video.id"
+            ref="playerRef"
+            :src="video.src"
+            :poster="video.cover"
+            :danmaku-items="danmakuItems"
+          />
+          <div v-else class="player-placeholder">
+            <div class="placeholder-inner">
+              <div class="placeholder-title">视频加载中...</div>
+              <div class="placeholder-subtitle">如果长时间无响应，请检查网络或稍后重试</div>
+            </div>
+          </div>
+          <div class="danmaku-bar" :class="{ disabled: !video }">
+            <input v-model="danmakuText" type="text" placeholder="发送一条弹幕" :disabled="!video" />
+            <button class="primary" :disabled="!video" @click="sendDanmaku">发送</button>
           </div>
         </div>
-      </div>
-      
-      <!-- 评论列表 -->
-      <div class="comment-list">
-        <CommentItem
-          v-for="comment in sortedComments"
-          :key="comment.id"
-          :comment="comment"
-          @reply="replyComment"
-          @like="likeComment"
-        />
-      </div>
-    </div>
-    
-    <!-- 相关推荐 -->
-    <div class="recommend-section">
-      <h3 class="section-title">相关推荐</h3>
-      <div class="recommend-list">
-        <VideoCard
-          v-for="v in recommendVideos"
-          :key="v.id"
-          :video="v"
-          @click="goToVideo(v)"
-        />
-      </div>
+        <button
+          class="right-close"
+          :style="{
+            right: infoVisible ? '-12px' : '0',
+          }"
+          @click="toggleInfo"
+        >
+          <span
+            class="right-close-icon"
+            :style="{ transform: infoVisible ? 'rotate(180deg)' : 'rotate(0deg)' }"
+          >
+            <BaseIcon name="back" :size="16" />
+          </span>
+        </button>
+      </section>
+
+      <aside class="video-info" :class="{ collapsed: !infoVisible }" :style="infoStyle">
+        <div class="video-info-tab">
+          <button :class="{ active: tab === 'info' }" @click="tab = 'info'">简介</button>
+          <button :class="{ active: tab === 'comment' }" @click="tab = 'comment'">
+            评论{{ commentTotal ? ` · ${commentTotal}` : '' }}
+          </button>
+        </div>
+
+        <div class="video-info-body">
+          <div v-if="tab === 'info'" class="video-content">
+            <div class="player-logo">
+              <div class="player-img">
+                <img v-if="video" :src="video.author.avatar" alt="avatar" />
+              </div>
+              <div class="usernames">
+                <div class="user">{{ video?.author.name }}</div>
+                <div class="content">{{ publishTime }}</div>
+              </div>
+              <button class="follow-btn no-app-region" type="button">关注</button>
+            </div>
+            <div class="player-context">
+              <div class="context">
+                <div>{{ video?.title }}</div>
+              </div>
+            </div>
+            <div class="video-text">
+              <div class="icon-wrapper">
+                <BaseIcon name="play" :size="14" />
+                <span>{{ formatCount(video?.views || 0) }}</span>
+              </div>
+              <div class="icon-wrapper">
+                <BaseIcon name="comment" :size="14" />
+                <span>{{ formatCount(video?.likes || 0) }}</span>
+              </div>
+              <div class="icon-wrapper">
+                <BaseIcon name="clock" :size="14" />
+                <span>{{ formatDuration(video?.duration || 0) }}</span>
+              </div>
+            </div>
+            <div class="btn-group">
+              <button class="hoverbtn">点赞</button>
+              <button class="hoverbtn">收藏</button>
+              <button class="hoverbtn">投币</button>
+              <button class="hoverbtn">分享</button>
+            </div>
+            <div class="info-panel">
+              <p v-if="video?.description" class="intro">{{ video?.description }}</p>
+              <p v-else class="intro muted">UP主还没有填写简介~</p>
+              <div v-if="video?.tags?.length" class="tags">
+                <span v-for="tag in video.tags" :key="tag" class="tag">#{{ tag }}</span>
+              </div>
+            </div>
+            <div class="recomand-video">
+              <RouterLink
+                v-for="item in videoStore.related"
+                :key="item.id"
+                :to="`/video/${item.id}`"
+                class="videoList"
+              >
+                <div class="wrapper">
+                  <img :src="item.cover" class="imgs" :alt="item.title" />
+                  <div class="videoTime">
+                    <div>{{ formatDuration(item.duration) }}</div>
+                  </div>
+                </div>
+                <div class="content">
+                  <div class="videoName">{{ item.title }}</div>
+                  <div class="upNames">
+                    <div class="top">
+                      <span class="up-badge">UP</span>
+                      <span>{{ item.author.name }}</span>
+                    </div>
+                    <div class="bottom">
+                      <div>
+                        <BaseIcon name="play" :size="12" />
+                        <span>{{ formatCount(item.views) }}</span>
+                      </div>
+                      <div>
+                        <BaseIcon name="comment" :size="12" />
+                        <span>{{ formatCount(item.likes) }}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </RouterLink>
+            </div>
+          </div>
+
+          <div v-else class="comment-section">
+            <div class="comment-input">
+              <textarea v-model="commentText" placeholder="写下你的评论"></textarea>
+              <button class="primary" :disabled="!canPost" @click="postComment">发布评论</button>
+              <span v-if="!canPost" class="hint">登录后可评论</span>
+            </div>
+            <CommentItem v-for="item in comments" :key="item.id" :comment="item" @reply="onReply" />
+            <div class="comment-more">
+              <button
+                v-if="comments.length < commentTotal"
+                class="ghost"
+                :disabled="commentLoading"
+                @click="loadMoreComments"
+              >
+                {{ commentLoading ? '加载中...' : '加载更多评论' }}
+              </button>
+              <span v-else class="end">没有更多评论</span>
+            </div>
+          </div>
+        </div>
+      </aside>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import {
-  PlayCircleIcon,
-  MessageSquareIcon,
-  ClockIcon,
-  ThumbsUpIcon,
-  StarIcon,
-  CoinsIcon,
-  Share2Icon
-} from 'lucide-vue-next'
-import VideoPlayer from '@/components/VideoPlayer/index.vue'
-import VideoCard from '@/components/VideoCard.vue'
-import CommentItem from '@/components/CommentItem.vue'
-import { useUserStore } from '@/stores/user'
-import { useHistoryStore } from '@/stores/history'
-import { videoApi } from '@/api/videoApi'
-import { commentApi } from '@/api/commentApi'
-import { danmakuApi } from '@/api/danmakuApi'
-import type { Video, VideoDetail, Comment, Danmaku } from '@/types'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { useRoute } from 'vue-router';
+import VideoPlayer from '../components/VideoPlayer/index.vue';
+import CommentItem from '../components/CommentItem.vue';
+import BaseIcon from '../components/BaseIcon.vue';
+import { useVideoStore } from '../stores/video';
+import { useHistoryStore } from '../stores/history';
+import { useUserStore } from '../stores/user';
+import { commentApi } from '../api/commentApi';
+import { danmakuApi } from '../api/danmakuApi';
+import { useDanmaku } from '../composables/useDanmaku';
+import type { CommentItem as CommentType } from '../types';
+import { formatCount, formatDateTime, formatDuration } from '../utils/format';
 
-const route = useRoute()
-const router = useRouter()
-const userStore = useUserStore()
-const historyStore = useHistoryStore()
+const route = useRoute();
+const videoStore = useVideoStore();
+const historyStore = useHistoryStore();
+const userStore = useUserStore();
 
-// Refs
-const playerRef = ref<InstanceType<typeof VideoPlayer>>()
-const video = ref<VideoDetail | null>(null)
-const danmakuList = ref<Danmaku[]>([])
-const comments = ref<Comment[]>([])
-const recommendVideos = ref<Video[]>([])
-const commentText = ref('')
-const sortBy = ref<'hot' | 'time'>('hot')
+const videoId = computed(() => route.params.id as string);
+const tab = ref<'info' | 'comment'>('info');
+const infoVisible = ref(true);
+const platform = ref('win32');
 
-// State
-const isLiked = ref(false)
-const isCollected = ref(false)
-const isCoined = ref(false)
-const isFollowing = ref(false)
+const comments = ref<CommentType[]>([]);
+const commentText = ref('');
+const commentPage = ref(1);
+const commentTotal = ref(0);
+const commentLoading = ref(false);
 
-// Computed
-const videoId = computed(() => route.params.id as string)
+const danmaku = useDanmaku();
+const danmakuText = ref('');
+const playerRef = ref<{ getCurrentTime: () => number } | null>(null);
+let unsubscribe: (() => void) | null = null;
+const danmakuItems = computed(() => [...danmaku.active.value]);
 
-const sortedComments = computed(() => {
-  const list = [...comments.value]
-  if (sortBy.value === 'hot') {
-    return list.sort((a, b) => b.likes - a.likes)
-  }
-  return list.sort((a, b) => new Date(b.createTime).getTime() - new Date(a.createTime).getTime())
-})
+const canPost = computed(() => userStore.isLoggedIn && userStore.profile);
 
-// Methods
-const loadVideo = async () => {
+const fetchComments = async (append = false) => {
+  if (!videoId.value) return;
+  commentLoading.value = true;
   try {
-    const res = await videoApi.getVideoDetail(videoId.value)
-    video.value = res.data
-    document.title = `${video.value?.title} - Bilibili`
-  } catch (e) {
-    console.error('加载视频失败:', e)
+    const result = await commentApi.list(videoId.value, commentPage.value, 6);
+    commentTotal.value = result.total;
+    comments.value = append ? [...comments.value, ...result.list] : result.list;
+  } finally {
+    commentLoading.value = false;
   }
-}
+};
 
-const loadDanmaku = async () => {
-  try {
-    const res = await danmakuApi.getDanmaku(videoId.value)
-    danmakuList.value = res.data
-  } catch (e) {
-    console.error('加载弹幕失败:', e)
+const loadMoreComments = async () => {
+  commentPage.value += 1;
+  await fetchComments(true);
+};
+
+const postComment = async () => {
+  if (!canPost.value || !videoId.value || !userStore.profile) return;
+  const value = commentText.value.trim();
+  if (!value) return;
+  const comment = await commentApi.post(videoId.value, value, userStore.profile.id);
+  comments.value = [comment, ...comments.value];
+  commentText.value = '';
+  commentTotal.value += 1;
+};
+
+const onReply = async ({ commentId, content }: { commentId: string; content: string }) => {
+  if (!canPost.value || !userStore.profile) return;
+  const updated = await commentApi.reply(commentId, content, userStore.profile.id);
+  comments.value = comments.value.map((item) => (item.id === updated.id ? updated : item));
+};
+
+const initDanmaku = async () => {
+  danmaku.clear();
+  if (!videoId.value) return;
+  const list = await danmakuApi.list(videoId.value);
+  list.slice(0, 12).forEach((item, index) => {
+    setTimeout(() => danmaku.push(item), index * 300);
+  });
+  unsubscribe?.();
+  unsubscribe = danmakuApi.subscribe(videoId.value, (item) => danmaku.push(item));
+};
+
+const sendDanmaku = async () => {
+  if (!videoId.value) return;
+  const value = danmakuText.value.trim();
+  if (!value) return;
+  const time = playerRef.value?.getCurrentTime?.() ?? 0;
+  await danmakuApi.send(videoId.value, value, userStore.profile?.id || 'guest', time);
+  danmakuText.value = '';
+};
+
+const init = async () => {
+  if (!videoId.value) return;
+  tab.value = 'info';
+  infoVisible.value = true;
+  await videoStore.fetchVideo(videoId.value);
+  if (videoStore.current) {
+    historyStore.addWatch(videoStore.current);
   }
-}
+  commentPage.value = 1;
+  await fetchComments(false);
+  await initDanmaku();
+};
 
-const loadComments = async () => {
-  try {
-    const res = await commentApi.getComments(videoId.value)
-    comments.value = res.data
-  } catch (e) {
-    console.error('加载评论失败:', e)
+onMounted(async () => {
+  await init();
+  const info = await window.electronAPI?.getAppInfo?.();
+  if (info?.platform) {
+    platform.value = info.platform;
   }
-}
+});
 
-const loadRecommend = async () => {
-  try {
-    const res = await videoApi.getRecommendVideos(6)
-    recommendVideos.value = res.data
-  } catch (e) {
-    console.error('加载推荐失败:', e)
+watch(videoId, init);
+
+onUnmounted(() => {
+  unsubscribe?.();
+});
+
+const video = computed(() => videoStore.current);
+const publishTime = computed(() => (video.value ? formatDateTime(video.value.publishAt) : ''));
+const infoStyle = computed(() => ({
+  flex: infoVisible.value ? '0 0 360px' : '0 0 0',
+}));
+const goHomeMargin = computed(() => (platform.value === 'win32' ? '10px' : '100px'));
+
+const toggleInfo = () => {
+  infoVisible.value = !infoVisible.value;
+};
+
+const goHome = () => {
+  if (window.electronAPI?.windowClose) {
+    window.electronAPI.windowClose();
+  } else {
+    window.history.back();
   }
-}
+};
 
-const onPlay = () => {
-  if (video.value) {
-    historyStore.addToHistory(video.value)
-  }
-}
-
-const onTimeUpdate = (time: number) => {
-  // 可以在这里实现观看进度保存
-}
-
-const onEnded = () => {
-  // 自动播放下一个
-}
-
-const formatNumber = (num: number): string => {
-  if (num >= 10000) {
-    return (num / 10000).toFixed(1) + '万'
-  }
-  return num.toString()
-}
-
-const toggleLike = () => {
-  isLiked.value = !isLiked.value
-  if (video.value) {
-    video.value.likes += isLiked.value ? 1 : -1
-  }
-}
-
-const toggleCollect = () => {
-  isCollected.value = !isCollected.value
-  if (video.value) {
-    video.value.collects += isCollected.value ? 1 : -1
-  }
-}
-
-const toggleCoin = () => {
-  if (!isCoined.value && video.value) {
-    isCoined.value = true
-    video.value.coins += 1
-  }
-}
-
-const share = () => {
-  // 实现分享功能
-}
-
-const goToUser = () => {
-  if (video.value?.author?.id) {
-    router.push(`/user/${video.value.author.id}`)
-  }
-}
-
-const toggleFollow = () => {
-  isFollowing.value = !isFollowing.value
-}
-
-const submitComment = async () => {
-  if (!commentText.value.trim()) return
-  
-  try {
-    const res = await commentApi.postComment(videoId.value, commentText.value)
-    comments.value.unshift(res.data)
-    commentText.value = ''
-  } catch (e) {
-    console.error('发表评论失败:', e)
-  }
-}
-
-const replyComment = (comment: Comment) => {
-  commentText.value = `回复 @${comment.author.name}: `
-}
-
-const likeComment = async (commentId: string) => {
-  try {
-    await commentApi.likeComment(commentId)
-    const comment = comments.value.find(c => c.id === commentId)
-    if (comment) {
-      comment.likes += 1
-    }
-  } catch (e) {
-    console.error('点赞评论失败:', e)
-  }
-}
-
-const goToVideo = (v: Video) => {
-  router.push(`/video/${v.id}`)
-}
-
-// Watch for route changes
-watch(() => route.params.id, () => {
-  loadVideo()
-  loadDanmaku()
-  loadComments()
-  window.scrollTo(0, 0)
-})
-
-onMounted(() => {
-  loadVideo()
-  loadDanmaku()
-  loadComments()
-  loadRecommend()
-})
+const minimizeWindow = () => window.electronAPI?.windowMinimize?.();
+const toggleMaximize = () => window.electronAPI?.windowToggleMaximize?.();
+const closeWindow = () => window.electronAPI?.windowClose?.();
 </script>
 
 <style scoped>
-.video-view {
-  padding-bottom: 40px;
-}
-
-.player-section {
-  width: 100%;
-  aspect-ratio: 16 / 9;
-  background: #000;
-}
-
-.info-section {
-  padding: 20px;
-  background: white;
-  margin-bottom: 12px;
+.video-player {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--color-body-bg);
+  color: var(--color-text);
+  display: flex;
+  flex-direction: column;
 }
 
 .video-header {
-  margin-bottom: 16px;
-}
-
-.video-title {
-  font-size: 20px;
-  font-weight: 600;
-  color: #18191c;
-  line-height: 1.5;
-  margin-bottom: 12px;
-}
-
-.video-stats {
-  display: flex;
-  gap: 20px;
-  color: #9499a0;
-  font-size: 13px;
-}
-
-.stat-item {
+  width: 100%;
+  height: 52px;
+  background: var(--color-navbar-bg);
   display: flex;
   align-items: center;
-  gap: 4px;
+  justify-content: space-between;
+  padding: 0 12px;
+  box-shadow: 0 1px 8px rgba(0, 0, 0, 0.06);
 }
 
-.stat-item .icon {
-  width: 16px;
-  height: 16px;
-}
-
-.video-actions {
-  display: flex;
-  gap: 16px;
-  padding: 16px 0;
-  border-bottom: 1px solid #f1f2f3;
-  margin-bottom: 16px;
-}
-
-.action-btn {
+.gohome {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 16px;
-  border: 1px solid #e3e5e7;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  color: var(--color-text);
+  background: var(--color-secondary-bg);
+}
+
+.gohome:hover {
+  background: var(--color-secondary-bg-for-transparent);
+}
+
+.window-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.window-controls button {
+  width: 30px;
+  height: 30px;
   border-radius: 8px;
-  background: white;
-  color: #61666d;
-  font-size: 14px;
-  cursor: pointer;
-  transition: all 0.2s;
+  display: grid;
+  place-items: center;
+  color: var(--color-text);
+  background: transparent;
+  transition: background var(--transition);
 }
 
-.action-btn:hover {
-  background: #f1f2f3;
+.window-controls button:hover {
+  background: var(--color-secondary-bg);
 }
 
-.action-btn.active {
-  background: #fb7299;
-  color: white;
-  border-color: #fb7299;
+.window-controls .close:hover {
+  background: rgba(255, 99, 99, 0.18);
 }
 
-.action-btn .icon {
-  width: 18px;
-  height: 18px;
-}
-
-.up-info {
+.video-layout {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 16px;
+  width: 100%;
+  height: calc(100% - 52px);
+  min-height: 0;
+  background: var(--color-body-bg);
 }
-
-.up-avatar {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  cursor: pointer;
-}
-
-.up-meta {
+.video {
   flex: 1;
+  min-width: 0;
+  min-height: 0;
+  position: relative;
+  background: transparent;
+  overflow: visible;
+  border-radius: var(--radius-md);
+  margin: 16px 12px 16px 16px;
+  box-shadow: var(--shadow);
 }
 
-.up-name {
-  font-size: 15px;
-  font-weight: 500;
-  color: #18191c;
-  cursor: pointer;
-  margin-bottom: 4px;
+.player-shell {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  background: #000;
 }
 
-.up-desc {
-  font-size: 13px;
-  color: #9499a0;
-}
-
-.follow-btn {
-  padding: 8px 20px;
-  border-radius: 4px;
-  border: none;
-  background: #fb7299;
-  color: white;
-  font-size: 14px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.follow-btn.followed {
-  background: #f1f2f3;
-  color: #9499a0;
-}
-
-.follow-btn:hover {
-  opacity: 0.9;
-}
-
-.video-desc {
-  color: #18191c;
-  line-height: 1.8;
-  font-size: 14px;
-}
-
-.video-desc p {
-  margin-bottom: 12px;
-}
-
-.video-tags {
+.danmaku-bar {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 16px;
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.tag {
-  padding: 4px 12px;
-  background: #f1f2f3;
-  border-radius: 12px;
-  font-size: 12px;
-  color: #61666d;
-}
-
-.comment-section {
-  background: white;
-  padding: 20px;
-  margin-bottom: 12px;
-}
-
-.comment-header {
-  display: flex;
-  justify-content: space-between;
+  gap: 10px;
   align-items: center;
-  margin-bottom: 20px;
+  background: rgba(15, 15, 17, 0.7);
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  backdrop-filter: blur(4px);
 }
 
-.comment-header h3 {
-  font-size: 18px;
+.danmaku-bar.disabled {
+  opacity: 0.6;
+}
+
+.danmaku-bar input {
+  flex: 1;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.right-close {
+  position: absolute;
+  width: 40px;
+  height: 60px;
+  color: #fff;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  margin: auto;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 12px 0 0 12px;
+  transition: background var(--transition);
+}
+
+.right-close-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform var(--transition);
+}
+
+.right-close:hover {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.player-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.75);
+  background: radial-gradient(circle at 50% 20%, rgba(255, 255, 255, 0.08), transparent 55%);
+  padding: 20px;
+}
+
+.placeholder-inner {
+  max-width: 280px;
+}
+
+.placeholder-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.placeholder-subtitle {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.55);
+  line-height: 1.6;
+}
+
+.primary {
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  background: var(--color-primary);
+  color: #fff;
+  font-weight: 700;
+  transition: filter var(--transition);
+}
+
+.primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.primary:not(:disabled):hover {
+  filter: brightness(1.05);
+}
+
+.video-info {
+  flex: 0 0 380px;
+  background: var(--color-secondary-bg);
+  color: var(--color-text);
+  overflow: hidden;
+  transition:
+    flex 0.2s ease,
+    opacity 0.2s ease;
+  padding: 16px;
+  border-left: 1px solid var(--border-color);
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.video-info.collapsed {
+  flex-basis: 0;
+  padding: 0;
+  opacity: 0;
+  pointer-events: none;
+  border-left: none;
+}
+
+.video-info-tab {
+  width: 100%;
+  height: 40px;
+  padding: 0 0 12px;
+  box-sizing: border-box;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  gap: 12px;
+}
+
+.video-info-body {
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.video-info-tab button {
+  color: var(--color-text);
   font-weight: 600;
 }
 
-.comment-sort {
+.video-info-tab button.active {
+  color: var(--color-primary);
+}
+
+.video-content,
+.comment-section {
+  width: 100%;
+  color: var(--color-text);
+  padding: 16px 0;
+  --color-secondary: var(--color-secondary);
+  --border-color: var(--border-color);
+}
+
+.player-logo {
+  width: 100%;
   display: flex;
-  gap: 16px;
-  font-size: 14px;
-  color: #9499a0;
+  align-items: center;
+  height: 50px;
+  gap: 10px;
 }
 
-.comment-sort span {
-  cursor: pointer;
-}
-
-.comment-sort span.active {
-  color: #18191c;
-  font-weight: 500;
-}
-
-.comment-input-area {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 24px;
-}
-
-.user-avatar {
+.player-img img {
   width: 40px;
   height: 40px;
   border-radius: 50%;
 }
 
-.input-wrapper {
+.usernames {
   flex: 1;
-}
-
-.input-wrapper textarea {
-  width: 100%;
-  padding: 12px;
-  border: 1px solid #e3e5e7;
-  border-radius: 8px;
-  resize: none;
-  font-size: 14px;
-  font-family: inherit;
-}
-
-.input-wrapper textarea:focus {
-  outline: none;
-  border-color: #fb7299;
-}
-
-.input-actions {
   display: flex;
-  justify-content: flex-end;
-  margin-top: 12px;
+  justify-content: center;
+  flex-direction: column;
 }
 
-.submit-btn {
-  padding: 8px 24px;
-  background: #fb7299;
-  color: white;
-  border: none;
-  border-radius: 4px;
+.user {
+  font-size: 15px;
+  font-weight: bold;
+}
+
+.content {
+  color: var(--color-secondary);
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.follow-btn {
+  padding: 8px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-primary);
+  color: var(--color-primary);
+  background: var(--color-primary-bg-for-transparent);
+  font-weight: 700;
+}
+
+.player-context {
+  display: flex;
+  width: 100%;
+  margin-top: 10px;
+  overflow: hidden;
+}
+
+.context > div:first-child {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  text-overflow: ellipsis;
+  word-break: break-word;
+  -webkit-line-clamp: 2;
   font-size: 14px;
-  cursor: pointer;
-  transition: opacity 0.2s;
+  font-weight: 600;
+  line-height: 20px;
 }
 
-.submit-btn:hover:not(:disabled) {
-  opacity: 0.9;
+.video-text {
+  height: 40px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  color: var(--color-secondary);
 }
 
-.submit-btn:disabled {
-  background: #e3e5e7;
-  cursor: not-allowed;
+.icon-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 5px;
 }
 
-.comment-list {
+.btn-group {
+  width: 100%;
+  display: flex;
+  justify-content: space-around;
+  padding: 10px 0;
+}
+
+.hoverbtn {
+  width: 60px;
+  padding: 5px;
+  border-radius: 5px;
+  color: var(--color-text);
+}
+
+.hoverbtn:hover {
+  background: var(--color-secondary-bg-for-transparent);
+}
+
+.info-panel {
+  padding: 12px 0 0;
+  border-top: 1px solid var(--border-color);
+  margin-top: 10px;
+}
+
+.intro {
+  line-height: 1.7;
+  font-size: 14px;
+  white-space: pre-wrap;
+}
+
+.intro.muted {
+  color: var(--color-secondary);
+}
+
+.tags {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.tag {
+  padding: 6px 10px;
+  background: var(--color-secondary-bg);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+}
+
+.recomand-video {
+  width: 100%;
+  border-top: 1px solid var(--border-color);
+  margin-top: 14px;
+}
+
+.videoList {
+  border-radius: 6px;
+  transition: all 0.3s ease;
+  box-sizing: border-box;
+  padding: 5px;
+  height: 100px;
+  width: 100%;
+  margin: 10px 0;
+  display: flex;
+  gap: 10px;
+  color: var(--color-text);
+}
+
+.videoList:hover {
+  background: var(--color-secondary-bg-for-transparent);
+}
+
+.wrapper {
+  flex: 0 0 150px;
+  position: relative;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.imgs {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  inset: 0;
+  object-fit: cover;
+  transition: opacity 0.3s ease;
+}
+
+.videoTime {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  background: rgba(0, 0, 0, 0.6);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.videoName {
+  font-weight: 600;
+  font-size: 13px;
+  line-height: 1.4;
+  margin-bottom: 6px;
+}
+
+.upNames {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 6px;
+  font-size: 12px;
 }
 
-.recommend-section {
-  background: white;
-  padding: 20px;
+.top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
-.section-title {
-  font-size: 18px;
-  font-weight: 600;
-  margin-bottom: 16px;
+.up-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  background: var(--color-primary-bg-for-transparent);
+  color: var(--color-primary);
+  padding: 2px 4px;
+  border-radius: 4px;
 }
 
-.recommend-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 16px;
+.bottom {
+  display: flex;
+  gap: 10px;
+  color: var(--color-secondary);
+}
+
+.bottom div {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.comment-input {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.comment-input textarea {
+  min-height: 80px;
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background: var(--color-body-bg);
+  color: var(--color-text);
+}
+
+.hint {
+  font-size: 12px;
+  color: var(--color-secondary);
+}
+
+.comment-more {
+  display: flex;
+  justify-content: center;
+  margin: 16px 0 0;
+}
+
+.ghost {
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  color: var(--color-text);
+  background: transparent;
+}
+
+.end {
+  font-size: 12px;
+  color: var(--color-secondary);
+}
+
+@media (max-width: 1024px) {
+  .video-layout {
+    flex-direction: column;
+  }
+
+  .video {
+    margin: 0;
+    border-radius: 0;
+  }
+
+  .player-shell {
+    border-radius: 0;
+  }
+
+  .video-info {
+    display: none;
+  }
+
+  .right-close {
+    display: none;
+  }
 }
 </style>

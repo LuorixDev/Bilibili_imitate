@@ -1,80 +1,62 @@
-import { ref, computed } from 'vue'
-import { defineStore } from 'pinia'
-import type { Video, VideoDetail } from '../types'
-import { videoApi } from '../api/videoApi'
+import { defineStore } from 'pinia';
+import type { VideoSummary } from '../types';
+import { videoApi } from '../api/videoApi';
 
-export const useVideoStore = defineStore('video', () => {
-  // State
-  const videoList = ref<Video[]>([])
-  const currentVideo = ref<VideoDetail | null>(null)
-  const loading = ref(false)
-  const hasMore = ref(true)
-  const page = ref(1)
-  const pageSize = 20
+interface VideoState {
+  recommendList: VideoSummary[];
+  recommendPage: number;
+  recommendTotal: number;
+  current: VideoSummary | null;
+  related: VideoSummary[];
+  searchList: VideoSummary[];
+  searchPage: number;
+  searchTotal: number;
+  loading: boolean;
+}
 
-  // Getters
-  const recommendations = computed(() => 
-    videoList.value.filter(v => v.id !== currentVideo.value?.id).slice(0, 10)
-  )
-
-  // Actions
-  const fetchVideos = async (refresh = false) => {
-    if (loading.value) return
-    
-    loading.value = true
-    try {
-      if (refresh) {
-        page.value = 1
-        videoList.value = []
+export const useVideoStore = defineStore('video', {
+  state: (): VideoState => ({
+    recommendList: [],
+    recommendPage: 1,
+    recommendTotal: 0,
+    current: null,
+    related: [],
+    searchList: [],
+    searchPage: 1,
+    searchTotal: 0,
+    loading: false,
+  }),
+  actions: {
+    async fetchRecommend(page = 1, pageSize = 12, append = false) {
+      this.loading = true;
+      try {
+        const result = await videoApi.getRecommend(page, pageSize);
+        this.recommendPage = result.page;
+        this.recommendTotal = result.total;
+        this.recommendList = append ? [...this.recommendList, ...result.list] : result.list;
+      } finally {
+        this.loading = false;
       }
-      
-      const res = await videoApi.getRecommendVideos(page.value, pageSize)
-      
-      if (res.data.length < pageSize) {
-        hasMore.value = false
+    },
+    async fetchVideo(id: string) {
+      this.loading = true;
+      try {
+        this.current = await videoApi.getById(id);
+        this.related = await videoApi.getRelated(id, 6);
+      } finally {
+        this.loading = false;
       }
-      
-      videoList.value.push(...res.data)
-      page.value++
-    } finally {
-      loading.value = false
-    }
-  }
-
-  const fetchVideoDetail = async (id: string) => {
-    loading.value = true
-    try {
-      const res = await videoApi.getVideoDetail(id)
-      currentVideo.value = res.data
-      return res.data
-    } finally {
-      loading.value = false
-    }
-  }
-
-  const searchVideos = async (keyword: string) => {
-    loading.value = true
-    try {
-      const res = await videoApi.searchVideos(keyword)
-      return res.data
-    } finally {
-      loading.value = false
-    }
-  }
-
-  const clearCurrentVideo = () => {
-    currentVideo.value = null
-  }
-
-  return {
-    videoList,
-    currentVideo,
-    loading,
-    hasMore,
-    recommendations,
-    fetchVideos,
-    fetchVideoDetail,
-    searchVideos,
-    clearCurrentVideo
-  }
-})
+    },
+    async search(keyword: string, page = 1, pageSize = 12, append = false) {
+      this.loading = true;
+      try {
+        const result = await videoApi.search(keyword, page, pageSize);
+        this.searchPage = result.page;
+        this.searchTotal = result.total;
+        this.searchList = append ? [...this.searchList, ...result.list] : result.list;
+      } finally {
+        this.loading = false;
+      }
+    },
+  },
+});

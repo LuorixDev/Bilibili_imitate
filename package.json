@@ -1,59 +1,46 @@
 {
-  "name": "bilibili-desktop",
-  "version": "1.0.0",
-  "description": "Electron + Vue3 桌面端视频平台客户端",
+  "name": "bilibili-electron-client",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Electron + Vue3 desktop video platform client demo",
+  "homepage": "https://example.com",
+  "author": {
+    "name": "shapaper",
+    "email": "shapaper@example.com"
+  },
   "main": "dist-electron/main.js",
-  "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vue-tsc && vite build && electron-builder",
-    "build:win": "vue-tsc && vite build && electron-builder --win",
-    "build:mac": "vue-tsc && vite build && electron-builder --mac",
-    "build:linux": "vue-tsc && vite build && electron-builder --linux",
+    "dev": "concurrently -k -n renderer,main,preload,electron -c blue,green,magenta,cyan \"npm:dev:renderer\" \"npm:dev:main\" \"npm:dev:preload\" \"npm:dev:electron\"",
+    "dev:renderer": "vite",
+    "dev:main": "esbuild src/main/index.ts --bundle --platform=node --outfile=dist-electron/main.js --external:electron --sourcemap --watch",
+    "dev:preload": "esbuild src/preload/index.ts --bundle --platform=node --outfile=dist-electron/preload.js --external:electron --sourcemap --watch",
+    "dev:electron": "wait-on tcp:5173 dist-electron/main.js dist-electron/preload.js && VITE_DEV_SERVER_URL=http://localhost:5173 electron .",
+    "build": "npm run build:renderer && npm run build:main && npm run build:preload",
+    "build:renderer": "vite build",
+    "build:main": "esbuild src/main/index.ts --bundle --platform=node --outfile=dist-electron/main.js --external:electron --minify --sourcemap",
+    "build:preload": "esbuild src/preload/index.ts --bundle --platform=node --outfile=dist-electron/preload.js --external:electron --minify --sourcemap",
+    "build:electron": "npm run build && electron-builder",
+    "build:electron:all": "npm run build && electron-builder -mwl",
+    "build:electron:win": "npm run build && electron-builder -w",
+    "build:electron:mac": "npm run build && electron-builder -m",
+    "build:electron:linux": "npm run build && electron-builder -l",
     "preview": "vite preview",
-    "lint": "eslint . --ext .vue,.ts,.tsx --fix",
-    "format": "prettier --write ."
-  },
-  "dependencies": {
-    "vue": "^3.4.21",
-    "vue-router": "^4.3.0",
-    "pinia": "^2.1.7",
-    "pinia-plugin-persistedstate": "^3.2.1",
-    "axios": "^1.6.8",
-    "dayjs": "^1.11.10",
-    "lodash-es": "^4.17.21",
-    "lucide-vue-next": "^0.344.0"
-  },
-  "devDependencies": {
-    "@vitejs/plugin-vue": "^5.0.4",
-    "@types/lodash-es": "^4.17.12",
-    "@types/node": "^20.11.30",
-    "@typescript-eslint/eslint-plugin": "^7.3.1",
-    "@typescript-eslint/parser": "^7.3.1",
-    "@vue/eslint-config-prettier": "^9.0.0",
-    "@vue/eslint-config-typescript": "^13.0.0",
-    "@vue/tsconfig": "^0.5.1",
-    "electron": "^29.1.5",
-    "electron-builder": "^24.13.3",
-    "eslint": "^8.57.0",
-    "eslint-plugin-vue": "^9.24.0",
-    "prettier": "^3.2.5",
-    "typescript": "^5.4.3",
-    "vite": "^5.2.6",
-    "vite-plugin-electron": "^0.28.4",
-    "vite-plugin-electron-renderer": "^0.14.5",
-    "vue-tsc": "^2.0.7"
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.node.json --noEmit",
+    "lint": "eslint . --ext .ts,.vue",
+    "format": "prettier . --write"
   },
   "build": {
-    "appId": "com.bilibili.desktop",
+    "appId": "com.bilibili.desktop.demo",
     "productName": "Bilibili Desktop",
     "directories": {
       "output": "release"
     },
     "files": [
-      "dist",
-      "dist-electron"
+      "dist/**",
+      "dist-electron/**",
+      "package.json"
     ],
+    "asar": true,
     "mac": {
       "target": [
         "dmg",
@@ -63,14 +50,38 @@
     "win": {
       "target": [
         "nsis",
-        "portable"
+        "zip"
       ]
     },
     "linux": {
+      "maintainer": "shapaper <shapaper@example.com>",
       "target": [
         "AppImage",
         "deb"
       ]
     }
+  },
+  "dependencies": {
+    "pinia": "^2.1.7",
+    "vue": "^3.4.38",
+    "vue-router": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.12",
+    "@typescript-eslint/eslint-plugin": "^7.18.0",
+    "@typescript-eslint/parser": "^7.18.0",
+    "@vitejs/plugin-vue": "^5.1.4",
+    "@vue/eslint-config-prettier": "^9.0.0",
+    "@vue/eslint-config-typescript": "^13.0.0",
+    "concurrently": "^8.2.2",
+    "electron": "^30.0.6",
+    "electron-builder": "^24.13.3",
+    "esbuild": "^0.23.0",
+    "eslint": "^8.57.0",
+    "eslint-plugin-vue": "^9.27.0",
+    "prettier": "^3.3.3",
+    "typescript": "^5.5.4",
+    "vite": "^5.4.3",
+    "wait-on": "^7.2.0"
   }
 }

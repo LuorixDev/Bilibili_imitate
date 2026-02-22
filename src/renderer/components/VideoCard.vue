@@ -1,211 +1,187 @@
 <template>
-  <div class="video-card" @click="handleClick">
-    <div class="video-cover">
-      <img :src="video.cover" :alt="video.title" />
-      <div class="video-duration">{{ formatDuration(video.duration) }}</div>
-      <div class="video-overlay">
-        <div class="play-btn">
-          <PlayIcon />
+  <div class="content-item">
+    <button class="link-item no-app-region" type="button" @click="openVideo">
+      <HoverVideo :src="video.src">
+        <div class="location-wrapper">
+          <img
+            loading="lazy"
+            :src="video.cover"
+            :alt="video.title"
+            class="pic"
+            :class="{ loaded }"
+            @load="loaded = true"
+          />
+          <div class="dart"></div>
+          <div class="videoMsg">
+            <div class="leftMsg">
+              <div class="videoSum">
+                <BaseIcon name="play" :size="14" />
+                <div>{{ formatCount(video.views) }}</div>
+              </div>
+              <div class="videoSum">
+                <BaseIcon name="comment" :size="14" />
+                <div>{{ formatCount(video.likes) }}</div>
+              </div>
+            </div>
+            <div class="duration">{{ formatDuration(video.duration) }}</div>
+          </div>
         </div>
-      </div>
-    </div>
-    <div class="video-info">
-      <h3 class="video-title">{{ video.title }}</h3>
-      <div class="video-meta">
-        <span class="author">
-          <UserIcon class="icon" />
-          {{ getAuthorName() }}
-        </span>
-        <span class="stats">
-          <PlayCircleIcon class="icon" />
-          {{ formatNumber(video.views) }}
-        </span>
-      </div>
-      <div class="video-stats">
-        <span class="time">{{ video.createdAt || video.publishTime }}</span>
-        <span v-if="video.category" class="category">{{ video.category }}</span>
+      </HoverVideo>
+    </button>
+    <div class="text-content">
+      <div class="content">{{ video.title }}</div>
+      <div class="up-icon">
+        <span class="up-badge">UP</span>
+        <div class="upcontent">{{ video.author.name }} · {{ formatDateTime(video.publishAt) }}</div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import type { Video } from '@/types'
-import { PlayIcon, PlayCircleIcon, UserIcon } from 'lucide-vue-next'
+import { ref } from 'vue';
+import { formatCount, formatDateTime, formatDuration } from '../utils/format';
+import type { VideoSummary } from '../types';
+import { useRouter } from 'vue-router';
+import BaseIcon from './BaseIcon.vue';
+import HoverVideo from './HoverVideo.vue';
 
-interface VideoWithAuthor extends Video {
-  authorName?: string
-  authorAvatar?: string
-  createdAt?: string
-  collects?: number
-  coins?: number
+interface Props {
+  video: VideoSummary;
 }
 
-const props = defineProps<{
-  video: VideoWithAuthor
-}>()
+const props = defineProps<Props>();
 
-const emit = defineEmits<{
-  click: [video: VideoWithAuthor]
-}>()
+const loaded = ref(false);
+const router = useRouter();
 
-const handleClick = () => {
-  emit('click', props.video)
-}
-
-const formatDuration = (seconds: number): string => {
-  const mins = Math.floor(seconds / 60)
-  const secs = seconds % 60
-  return `${mins}:${secs.toString().padStart(2, '0')}`
-}
-
-const formatNumber = (num: number): string => {
-  if (num >= 10000) {
-    return (num / 10000).toFixed(1) + '万'
+const openVideo = async () => {
+  const api = window.electronAPI as ElectronAPI | undefined;
+  if (api?.openVideoWindow) {
+    await api.openVideoWindow(props.video.id);
+  } else {
+    router.push(`/video/${props.video.id}`);
   }
-  if (num >= 1000) {
-    return (num / 1000).toFixed(1) + '千'
-  }
-  return num.toString()
-}
-
-// 获取作者名称
-const getAuthorName = (): string => {
-  if (props.video.authorName) {
-    return props.video.authorName
-  }
-  if (props.video.author && typeof props.video.author === 'object') {
-    return props.video.author.name
-  }
-  return '未知作者'
-}
+};
 </script>
 
 <style scoped>
-.video-card {
-  background: white;
-  border-radius: 8px;
+.content-item {
   overflow: hidden;
-  cursor: pointer;
-  transition: all 0.3s;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  box-sizing: border-box;
+  padding-bottom: 82%;
+  height: 0;
+  display: inline-block;
+  margin-left: 20px;
+  margin-top: 10px;
 }
 
-.video-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+.link-item {
+  display: block;
+  width: 100%;
 }
 
-.video-card:hover .video-overlay {
+.location-wrapper {
+  position: relative;
+  color: var(--color-secondary-bg);
+  border-radius: 8px;
+  background: var(--color-secondary-bg);
+  overflow: hidden;
+}
+
+.location-wrapper:hover .videoMsg,
+.location-wrapper:hover .dart {
+  opacity: 0;
+}
+
+.pic {
+  width: 100%;
+  height: 140px;
+  transition: opacity 0.3s ease;
+  opacity: 0;
+  object-fit: cover;
+}
+
+.pic.loaded {
   opacity: 1;
 }
 
-.video-cover {
-  position: relative;
-  aspect-ratio: 16 / 10;
-  overflow: hidden;
-}
-
-.video-cover img {
+.dart {
+  transition: all 0.3s ease;
   width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transition: transform 0.3s;
-}
-
-.video-card:hover .video-cover img {
-  transform: scale(1.05);
-}
-
-.video-duration {
+  opacity: 1;
   position: absolute;
-  bottom: 8px;
-  right: 8px;
-  background: rgba(0, 0, 0, 0.75);
-  color: white;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 500;
+  bottom: 0;
+  height: 25px;
+  background-image: linear-gradient(180deg, rgba(33, 33, 33, 0), rgba(33, 33, 33, 0.5));
 }
 
-.video-overlay {
+.videoMsg {
+  background: linear-gradient(180deg, rgba(33, 33, 33, 0), rgba(33, 33, 33, 0.5));
+  width: 100%;
+  opacity: 1;
   position: absolute;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.4);
+  bottom: 0;
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  justify-content: center;
-  opacity: 0;
-  transition: opacity 0.3s;
-}
-
-.play-btn {
-  width: 56px;
-  height: 56px;
-  background: rgba(251, 114, 153, 0.95);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  transform: scale(0.8);
-  transition: transform 0.3s;
-}
-
-.video-card:hover .play-btn {
-  transform: scale(1);
-}
-
-.video-info {
-  padding: 12px;
-}
-
-.video-title {
-  font-size: 14px;
-  font-weight: 500;
-  color: #18191c;
-  line-height: 1.5;
-  margin-bottom: 8px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  min-height: 42px;
-}
-
-.video-meta {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+  padding-left: 5px;
+  padding-right: 6px;
+  transition: all 0.3s ease;
+  font-weight: bold;
+  color: #fff;
   font-size: 12px;
-  color: #9499a0;
-  margin-bottom: 6px;
 }
 
-.video-meta span {
+.leftMsg {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.videoSum {
   display: flex;
   align-items: center;
   gap: 4px;
 }
 
-.video-meta .icon {
-  width: 14px;
-  height: 14px;
+.text-content {
+  height: 40%;
 }
 
-.video-stats {
+.content {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  font-weight: bold;
+  font-size: 100%;
+  line-height: 20px;
+  height: 40px;
+}
+
+.up-icon {
   display: flex;
-  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-secondary);
   font-size: 12px;
-  color: #9499a0;
 }
 
-.category {
-  background: #f1f2f3;
-  padding: 2px 8px;
-  border-radius: 10px;
-  font-size: 11px;
+.up-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 4px;
+  border-radius: 4px;
+  background: var(--color-primary-bg-for-transparent);
+  font-size: 10px;
+  color: var(--color-primary);
+}
+
+.upcontent {
+  line-height: 0;
+  margin-left: 4px;
 }
 </style>

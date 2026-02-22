@@ -1,262 +1,541 @@
 <template>
-  <header class="header-bar">
-    <div class="header-left">
-      <div class="logo" @click="$router.push('/')">
-        <svg viewBox="0 0 24 24" fill="#FB7299" class="logo-icon">
-          <path d="M17.813 4.653h.854c1.51.054 2.769.578 3.773 1.574 1.004.995 1.524 2.249 1.56 3.76v7.36c-.036 1.51-.556 2.769-1.56 3.773s-2.262 1.524-3.773 1.56H5.333c-1.51-.036-2.769-.556-3.773-1.56S.036 18.858 0 17.347v-7.36c.036-1.511.556-2.765 1.56-3.76 1.004-.996 2.262-1.52 3.773-1.574h.774l-1.174-1.12a1.234 1.234 0 0 1-.373-.906c0-.356.124-.658.373-.907l.027-.023a1.22 1.22 0 0 1 .853-.344c.355 0 .657.124.906.373l2.573 2.56h5.909l2.573-2.56a1.218 1.218 0 0 1 .853-.344c.356 0 .658.124.907.373.375.348.563.769.563 1.264 0 .495-.188.916-.563 1.264l-1.147 1.093zm-4.147 8.64c.267-.467.669-.701 1.206-.701.537 0 .906.247 1.106.741.12.28.18.618.18 1.013s-.06.73-.18 1.007c-.2.467-.569.701-1.106.701s-.939-.234-1.206-.701a2. asymmetric 2. asymmetric 0 0 1-.18-1.007c0-.395.06-.732.18-1.013zM7.598 12.59c0-.395.06-.733.18-1.013.2-.494.569-.741 1.106-.741s.939.234 1.206.701c.12.28.18.618.18 1.013s-.06.73-.18 1.007c-.267.467-.669.701-1.206.701s-.906-.234-1.106-.701a2.193 2.193 0 0 1-.18-1.007z"/>
-        </svg>
-        <span class="logo-text">Bilibili</span>
+  <header class="app-header app-region">
+    <div class="logo-wrapper">
+      <div class="logo FlexCenter">
+        <div class="logo-mark">B</div>
       </div>
+      <nav v-show="!focused" class="menu-wrapper">
+        <RouterLink to="/" class="menu-item" active-class="active">推荐</RouterLink>
+        <RouterLink to="/category" class="menu-item" active-class="active">分类</RouterLink>
+        <RouterLink to="/live" class="menu-item" active-class="active">直播</RouterLink>
+        <RouterLink to="/hot" class="menu-item" active-class="active">热门</RouterLink>
+      </nav>
     </div>
 
-    <div class="header-center">
-      <div class="search-box">
-        <input 
-          v-model="searchKeyword" 
-          type="text" 
-          placeholder="搜索视频、番剧、up主..."
-          @keyup.enter="handleSearch"
+    <div class="search-wrapper" :class="{ focused }">
+      <div class="search-input no-app-region" :class="{ focused }">
+        <input
+          v-model="keyword"
+          type="text"
+          placeholder="搜索感兴趣的视频"
+          @focus="onFocus"
+          @blur="onBlur"
+          @keyup.enter="onSearch"
         />
-        <button class="search-btn" @click="handleSearch">
-          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 0 0 1.48-5.34c-.47-2.78-2.79-5-5.59-5.34a6.505 6.505 0 0 0-7.27 7.27c.34 2.8 2.56 5.12 5.34 5.59a6.5 6.5 0 0 0 5.34-1.48l.27.28v.79l4.25 4.25c.41.41 1.08.41 1.49 0 .41-.41.41-1.08 0-1.49L15.5 14zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
-        </button>
-      </div>
-    </div>
-
-    <div class="header-right">
-      <template v-if="userStore.isLogin">
-        <div class="user-info" @click="$router.push('/user')">
-          <img :src="userStore.userInfo?.avatar" class="avatar" />
-          <span class="username">{{ userStore.userInfo?.username }}</span>
+        <div class="search-icons">
+          <button
+            v-show="keyword"
+            class="icon-btn"
+            type="button"
+            @mousedown.prevent
+            @click="clearKeyword"
+          >
+            <BaseIcon name="close" :size="16" />
+          </button>
+          <button class="icon-btn" type="button" @mousedown.prevent @click="onSearch">
+            <BaseIcon name="search" :size="18" />
+          </button>
         </div>
-        <button class="btn-logout" @click="handleLogout">退出</button>
-      </template>
-      <button v-else class="btn-login" @click="showLogin = true">登录</button>
+        <Transition name="fade">
+          <div v-if="focused" class="search-panel" @mousedown.prevent>
+            <div v-if="keyword && suggestions.length" class="search-list">
+              <div
+                v-for="item in suggestions"
+                :key="item"
+                class="search-item"
+                @click="selectSuggestion(item)"
+              >
+                {{ item }}
+              </div>
+            </div>
+            <div v-else class="search-content">
+              <div class="search-title">
+                <h4>搜索历史</h4>
+                <button type="button" @click="historyStore.clearSearch">清空</button>
+              </div>
+              <div class="search-history">
+                <button
+                  v-for="item in historyStore.searchHistory"
+                  :key="item"
+                  type="button"
+                  class="history-item"
+                  @click="selectSuggestion(item)"
+                >
+                  {{ item }}
+                </button>
+                <span v-if="!historyStore.searchHistory.length" class="empty">暂无记录</span>
+              </div>
+              <div class="search-title mt-10">
+                <h4>热搜</h4>
+              </div>
+              <div class="hot-list">
+                <button
+                  v-for="(item, index) in hotKeywords"
+                  :key="item"
+                  type="button"
+                  class="hot-item"
+                  @click="selectSuggestion(item)"
+                >
+                  <span class="rank">{{ index + 1 }}</span>
+                  <span class="text">{{ item }}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </Transition>
+      </div>
     </div>
 
-    <!-- 登录弹窗 -->
-    <div v-if="showLogin" class="login-modal" @click="showLogin = false">
-      <div class="login-box" @click.stop>
-        <h3>用户登录</h3>
-        <input v-model="loginForm.username" placeholder="用户名" />
-        <input v-model="loginForm.password" type="password" placeholder="密码" />
-        <button @click="handleLogin">登录</button>
-      </div>
+    <div class="user-panel">
+      <template v-if="userStore.isLoggedIn && userStore.profile">
+        <img :src="userStore.profile.avatar" alt="avatar" />
+        <div class="user-info">
+          <div class="name">{{ userStore.profile.name }}</div>
+          <div class="meta">Lv.{{ userStore.profile.level }}</div>
+        </div>
+        <button class="ghost" @click="goProfile">个人中心</button>
+        <button class="ghost" @click="userStore.logout">退出</button>
+      </template>
+      <template v-else>
+        <button class="primary" @click="goProfile">登录</button>
+      </template>
+    </div>
+
+    <div class="window-controls no-app-region">
+      <button class="window-btn" title="最小化" @click="minimizeWindow">
+        <BaseIcon name="minimize" :size="14" />
+      </button>
+      <button
+        class="window-btn"
+        :class="{ active: isMaximized }"
+        title="最大化/还原"
+        @click="toggleMaximize"
+      >
+        <BaseIcon name="maximize" :size="14" />
+      </button>
+      <button class="window-btn close" title="关闭" @click="closeWindow">
+        <BaseIcon name="close" :size="14" />
+      </button>
     </div>
   </header>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
-import { useRouter } from 'vue-router'
-import { useUserStore } from '../stores/user'
+import { onMounted, onUnmounted, ref, watch } from 'vue';
+import { useRouter } from 'vue-router';
+import BaseIcon from './BaseIcon.vue';
+import { useHistoryStore } from '../stores/history';
+import { useUserStore } from '../stores/user';
+import { searchApi } from '../api/searchApi';
+import { useDebounce } from '../composables/useDebounce';
 
-const router = useRouter()
-const userStore = useUserStore()
+const router = useRouter();
+const userStore = useUserStore();
+const historyStore = useHistoryStore();
 
-const searchKeyword = ref('')
-const showLogin = ref(false)
-const loginForm = reactive({
-  username: '',
-  password: ''
-})
+const keyword = ref('');
+const focused = ref(false);
+const suggestions = ref<string[]>([]);
+const hotKeywords = ref<string[]>([]);
+const isMaximized = ref(false);
 
-const handleSearch = () => {
-  if (searchKeyword.value.trim()) {
-    router.push({
-      path: '/search',
-      query: { q: searchKeyword.value }
-    })
+const onSearch = () => {
+  const value = keyword.value.trim();
+  if (!value) return;
+  historyStore.addSearch(value);
+  focused.value = false;
+  router.push({ name: 'search', query: { q: value } });
+};
+
+const selectSuggestion = (value: string) => {
+  keyword.value = value;
+  onSearch();
+};
+
+const clearKeyword = () => {
+  keyword.value = '';
+  suggestions.value = [];
+};
+
+const goProfile = () => {
+  router.push({ name: 'user' });
+};
+
+const onFocus = () => {
+  focused.value = true;
+};
+
+const onBlur = () => {
+  setTimeout(() => {
+    focused.value = false;
+  }, 200);
+};
+
+const fetchSuggestions = async () => {
+  const value = keyword.value.trim();
+  if (!value) {
+    suggestions.value = [];
+    return;
   }
-}
+  const result = await searchApi.getSuggestions(value);
+  suggestions.value = result;
+};
 
-const handleLogin = async () => {
-  await userStore.login(loginForm.username, loginForm.password)
-  showLogin.value = false
-  loginForm.username = ''
-  loginForm.password = ''
-}
+const debouncedFetch = useDebounce(fetchSuggestions, 300);
 
-const handleLogout = () => {
-  userStore.logout()
-  router.push('/')
-}
+const syncMaximizeState = async () => {
+  isMaximized.value = (await window.electronAPI?.windowIsMaximized?.()) ?? false;
+};
+
+const minimizeWindow = () => {
+  window.electronAPI?.windowMinimize?.();
+};
+
+const toggleMaximize = async () => {
+  isMaximized.value = (await window.electronAPI?.windowToggleMaximize?.()) ?? false;
+};
+
+const closeWindow = () => {
+  window.electronAPI?.windowClose?.();
+};
+
+onMounted(async () => {
+  userStore.init();
+  hotKeywords.value = await searchApi.getHotKeywords();
+  await syncMaximizeState();
+  window.addEventListener('resize', syncMaximizeState);
+});
+
+watch(keyword, () => {
+  debouncedFetch();
+});
+
+onUnmounted(() => {
+  window.removeEventListener('resize', syncMaximizeState);
+});
 </script>
 
 <style scoped>
-.header-bar {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 64px;
-  background: #fff;
-  border-bottom: 1px solid #e3e5e7;
+.app-header {
+  width: 100%;
+  height: 70px;
   display: flex;
   align-items: center;
-  padding: 0 24px;
-  z-index: 1000;
+  justify-content: flex-start;
+  padding: 0 10px 0 0;
+  background: var(--color-body-bg);
+  border-bottom: 1px solid var(--border-color);
+  box-shadow: var(--shadow);
 }
 
-.header-left {
-  width: 200px;
+.app-header button,
+.app-header input,
+.app-header a,
+.app-header .search-panel {
+  -webkit-app-region: none;
+}
+
+.logo-wrapper {
+  display: flex;
+  align-items: center;
+  position: relative;
+  padding-left: 24px;
+  gap: 24px;
+  min-width: 360px;
 }
 
 .logo {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-}
-
-.logo-icon {
   width: 40px;
   height: 40px;
+  position: absolute;
+  left: 24px;
+  top: 50%;
+  transform: translateY(-50%);
 }
 
-.logo-text {
-  font-size: 20px;
-  font-weight: 600;
-  color: #FB7299;
+.logo-mark {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: var(--color-primary);
+  color: white;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
 }
 
-.header-center {
+.menu-wrapper {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  margin-left: 120px;
+}
+
+.menu-item {
+  position: relative;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--color-text);
+  padding: 6px 2px;
+  transition: color 0.2s ease;
+}
+
+.menu-item.active {
+  color: var(--color-primary);
+}
+
+.menu-item.active::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 52px;
+  margin: auto;
+  width: 100%;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--color-primary);
+}
+
+.search-wrapper {
   flex: 1;
   display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 20px;
+  position: relative;
+}
+
+.search-wrapper.focused {
   justify-content: center;
 }
 
-.search-box {
+.search-input {
+  position: relative;
+  width: 320px;
+  height: 40px;
+  background: var(--color-secondary-bg);
+  border-radius: 6px;
   display: flex;
-  width: 500px;
-  max-width: 100%;
+  align-items: center;
+  padding: 6px 8px 6px 12px;
+  border: 1px solid transparent;
+  transition: all 0.3s ease;
+  overflow: visible;
 }
 
-.search-box input {
-  flex: 1;
-  height: 40px;
-  padding: 0 16px;
-  border: 2px solid #e3e5e7;
-  border-right: none;
-  border-radius: 8px 0 0 8px;
+.search-input.focused {
+  width: 500px;
+  background: var(--color-body-bg);
+  border-color: var(--color-primary);
+}
+
+.search-input input {
+  width: 100%;
+  background: transparent;
+  border: none;
   outline: none;
   font-size: 14px;
 }
 
-.search-box input:focus {
-  border-color: #FB7299;
-}
-
-.search-btn {
-  width: 48px;
-  height: 40px;
-  background: #FB7299;
-  border: none;
-  border-radius: 0 8px 8px 0;
-  cursor: pointer;
+.search-icons {
   display: flex;
+  gap: 6px;
   align-items: center;
-  justify-content: center;
 }
 
-.search-btn svg {
-  width: 20px;
-  height: 20px;
-  color: #fff;
+.icon-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  display: grid;
+  place-items: center;
 }
 
-.header-right {
-  width: 200px;
+.search-panel {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  width: 100%;
+  background: var(--color-body-bg);
+  border-radius: 8px;
+  box-shadow: 0 0 30px rgba(0, 0, 0, 0.1);
+  padding: 0 10px 14px;
+  z-index: 20;
+}
+
+.search-content {
   display: flex;
-  align-items: center;
-  justify-content: flex-end;
+  flex-direction: column;
   gap: 16px;
+  margin-top: 14px;
 }
 
-.user-info {
+.search-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.search-title button {
+  font-size: 12px;
+  color: var(--color-secondary);
+}
+
+.search-history {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.history-item {
+  background: var(--color-secondary-bg-for-transparent);
+  padding: 5px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.empty {
+  font-size: 12px;
+  color: var(--color-secondary);
+}
+
+.hot-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.hot-item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  cursor: pointer;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  transition: background 0.2s ease;
 }
 
-.avatar {
+.hot-item:hover {
+  background: var(--color-secondary-bg-for-transparent);
+}
+
+.rank {
+  width: 18px;
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+.text {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.search-list {
+  display: flex;
+  flex-direction: column;
+  margin-top: 12px;
+}
+
+.search-item {
+  padding: 8px 10px;
+  border-radius: 6px;
+}
+
+.search-item:hover {
+  background: var(--color-secondary-bg-for-transparent);
+}
+
+.user-panel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-right: 16px;
+}
+
+.user-panel img {
   width: 36px;
   height: 36px;
   border-radius: 50%;
 }
 
-.username {
-  font-size: 14px;
-  color: #18191c;
-  max-width: 80px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.user-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
-.btn-login, .btn-logout {
-  padding: 8px 20px;
-  border-radius: 4px;
-  font-size: 14px;
-  cursor: pointer;
-  border: 1px solid #FB7299;
+.user-info .name {
+  font-weight: 600;
 }
 
-.btn-login {
-  background: #FB7299;
-  color: #fff;
+.user-info .meta {
+  font-size: 12px;
+  color: var(--color-secondary);
 }
 
-.btn-logout {
-  background: #fff;
-  color: #FB7299;
+.primary {
+  padding: 6px 16px;
+  border-radius: 999px;
+  background: var(--color-primary);
+  color: white;
+  font-weight: 600;
 }
 
-.login-modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0,0,0,0.5);
+.ghost {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  font-size: 12px;
+}
+
+.window-controls {
   display: flex;
   align-items: center;
-  justify-content: center;
-  z-index: 2000;
+  gap: 4px;
+  margin-left: 6px;
 }
 
-.login-box {
-  background: #fff;
-  padding: 32px;
-  border-radius: 12px;
-  width: 360px;
+.window-btn {
+  width: 36px;
+  height: 28px;
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+  color: var(--color-text);
+  transition: background 0.2s ease;
 }
 
-.login-box h3 {
-  text-align: center;
-  margin-bottom: 24px;
-  color: #18191c;
+.window-btn:hover {
+  background: var(--color-secondary-bg-for-transparent);
 }
 
-.login-box input {
-  width: 100%;
-  height: 44px;
-  margin-bottom: 16px;
-  padding: 0 12px;
-  border: 1px solid #e3e5e7;
-  border-radius: 8px;
-  font-size: 14px;
+.window-btn.active {
+  background: var(--color-secondary-bg-for-transparent);
 }
 
-.login-box button {
-  width: 100%;
-  height: 44px;
-  background: #FB7299;
-  color: #fff;
-  border: none;
-  border-radius: 8px;
-  font-size: 16px;
-  cursor: pointer;
+.window-btn.close:hover {
+  background: #f46d75;
+  color: white;
+}
+
+.mt-10 {
+  margin-top: 10px;
+}
+
+@media (max-width: 1100px) {
+  .menu-wrapper {
+    display: none;
+  }
+
+  .search-input,
+  .search-input.focused {
+    width: 280px;
+  }
+
+  .search-panel {
+    width: 360px;
+  }
 }
 </style>

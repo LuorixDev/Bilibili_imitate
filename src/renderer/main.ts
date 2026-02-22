@@ -1,11 +1,18 @@
-import { createApp } from 'vue'
-import { createPinia } from 'pinia'
-import App from './App.vue'
-import router from './router'
+import { createApp } from 'vue';
+import { createPinia } from 'pinia';
+import App from './App.vue';
+import router from './router';
+import './styles/variables.css';
+import './styles/base.css';
+import './styles/layout.css';
+import { initThemeSync, loadTheme } from './utils/theme';
 
-const app = createApp(App)
+const app = createApp(App);
 
-app.use(createPinia())
-app.use(router)
+loadTheme();
+initThemeSync();
 
-app.mount('#app')
+app.use(createPinia());
+app.use(router);
+
+app.mount('#app');

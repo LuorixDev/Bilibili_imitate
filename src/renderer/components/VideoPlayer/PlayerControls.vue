@@ -1,366 +1,232 @@
 <template>
-  <div class="player-controls" :class="{ 'show-always': !playing || hovering }" @click.stop>
-    <!-- 进度条 -->
-    <div class="progress-bar" @click="onProgressClick" @mousemove="onProgressHover">
-      <div class="progress-bg"></div>
-      <div class="progress-buffer" :style="{ width: bufferedPercent + '%' }"></div>
-      <div class="progress-current" :style="{ width: progressPercent + '%' }"></div>
-      <div class="progress-handle" :style="{ left: progressPercent + '%' }"></div>
-      <div v-if="hoverTime" class="progress-tooltip" :style="{ left: hoverPercent + '%' }">
-        {{ formatTime(hoverTime) }}
+  <div class="controls">
+    <button
+      class="play-button"
+      :class="{ play: !isPlaying, pause: isPlaying }"
+      @click="emit('toggle')"
+    >
+      {{ isPlaying ? '暂停' : '播放' }}
+    </button>
+    <div class="control-bar">
+      <div class="left">
+        <span class="time">{{ formatDuration(currentTime) }}</span>
+        <span class="split">/</span>
+        <span class="total-duration">{{ formatDuration(duration) }}</span>
       </div>
-    </div>
-    
-    <div class="controls-row">
-      <div class="controls-left">
-        <!-- 播放/暂停 -->
-        <button class="control-btn" @click="togglePlay">
-          <PlayIcon v-if="!playing" :size="24" />
-          <PauseIcon v-else :size="24" />
-        </button>
-        
-        <!-- 时间显示 -->
-        <span class="time-display">
-          {{ formatTime(currentTime) }} / {{ formatTime(duration) }}
-        </span>
+      <div class="center">
+        <div class="progress-wrapper">
+          <input
+            type="range"
+            min="0"
+            :max="duration"
+            step="0.1"
+            :value="currentTime"
+            :style="{ background: progressBackground }"
+            @input="onSeek"
+          />
+        </div>
       </div>
-      
-      <div class="controls-right">
-        <!-- 弹幕开关 -->
-        <button
-          class="control-btn"
-          :class="{ active: danmakuEnabled }"
-          @click="$emit('toggle-danmaku')"
-          title="弹幕"
-        >
-          <MessageSquareIcon :size="20" />
+      <div class="right">
+        <button class="barrage" :class="showDanmaku ? 'on' : 'off'" @click="emit('toggleDanmaku')">
+          弹幕
         </button>
-        
-        <!-- 倍速 -->
-        <div class="speed-selector">
-          <button class="control-btn speed-btn" @click="showSpeedMenu = !showSpeedMenu">
-            {{ playbackRate }}x
+        <div class="volume">
+          <button class="volume-btn" @click="emit('mute')">
+            {{ isMuted ? '静音' : '音量' }}
           </button>
-          <div v-if="showSpeedMenu" class="speed-menu">
-            <div
-              v-for="rate in speedOptions"
-              :key="rate"
-              class="speed-option"
-              :class="{ active: playbackRate === rate }"
-              @click="selectSpeed(rate)"
-            >
-              {{ rate }}x
-            </div>
-          </div>
+          <input type="range" min="0" max="1" step="0.05" :value="volume" @input="onVolume" />
         </div>
-        
-        <!-- 音量 -->
-        <div class="volume-control" @mouseenter="showVolume = true" @mouseleave="showVolume = false">
-          <button class="control-btn" @click="$emit('toggle-mute')">
-            <Volume2Icon v-if="!muted && volume > 0" :size="20" />
-            <VolumeXIcon v-else :size="20" />
-          </button>
-          <div v-if="showVolume" class="volume-slider">
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.1"
-              :value="volume"
-              @input="onVolumeInput"
-              orient="vertical"
-            />
-          </div>
-        </div>
-        
-        <!-- 全屏 -->
-        <button class="control-btn" @click="$emit('toggle-fullscreen')">
-          <MaximizeIcon v-if="!fullscreen" :size="20" />
-          <MinimizeIcon v-else :size="20" />
-        </button>
+        <button class="fullscreen" @click="emit('fullscreen')">全屏</button>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import {
-  PlayIcon,
-  PauseIcon,
-  MessageSquareIcon,
-  Volume2Icon,
-  VolumeXIcon,
-  MaximizeIcon,
-  MinimizeIcon
-} from 'lucide-vue-next'
+import { computed } from 'vue';
+import { formatDuration } from '../../utils/format';
 
-const props = defineProps<{
-  playing: boolean
-  currentTime: number
-  duration: number
-  volume: number
-  muted: boolean
-  fullscreen: boolean
-  danmakuEnabled: boolean
-  playbackRate: number
-}>()
+interface Props {
+  isPlaying: boolean;
+  duration: number;
+  currentTime: number;
+  volume: number;
+  isMuted: boolean;
+  isFullscreen: boolean;
+  showDanmaku: boolean;
+}
 
+const props = defineProps<Props>();
 const emit = defineEmits<{
-  play: []
-  pause: []
-  seek: [time: number]
-  'volume-change': [volume: number]
-  'toggle-mute': []
-  'toggle-fullscreen': []
-  'toggle-danmaku': []
-  'rate-change': [rate: number]
-}>()
+  (e: 'toggle'): void;
+  (e: 'seek', value: number): void;
+  (e: 'volume', value: number): void;
+  (e: 'mute'): void;
+  (e: 'fullscreen'): void;
+  (e: 'toggleDanmaku'): void;
+}>();
 
-// State
-const hovering = ref(false)
-const hoverTime = ref<number | null>(null)
-const hoverPercent = ref(0)
-const showVolume = ref(false)
-const showSpeedMenu = ref(false)
-const bufferedPercent = ref(100)
+const onSeek = (event: Event) => {
+  const target = event.target as HTMLInputElement;
+  emit('seek', Number(target.value));
+};
 
-const speedOptions = [0.5, 0.75, 1, 1.25, 1.5, 2]
+const onVolume = (event: Event) => {
+  const target = event.target as HTMLInputElement;
+  emit('volume', Number(target.value));
+};
 
-// Computed
-const progressPercent = computed(() => {
-  if (props.duration === 0) return 0
-  return (props.currentTime / props.duration) * 100
-})
-
-// Methods
-const togglePlay = () => {
-  if (props.playing) {
-    emit('pause')
-  } else {
-    emit('play')
-  }
-}
-
-const formatTime = (seconds: number): string => {
-  if (!seconds || isNaN(seconds)) return '00:00'
-  const mins = Math.floor(seconds / 60)
-  const secs = Math.floor(seconds % 60)
-  const hours = Math.floor(mins / 60)
-  
-  if (hours > 0) {
-    return `${hours}:${(mins % 60).toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
-  }
-  return `${mins}:${secs.toString().padStart(2, '0')}`
-}
-
-const onProgressClick = (e: MouseEvent) => {
-  const target = e.currentTarget as HTMLElement
-  const rect = target.getBoundingClientRect()
-  const percent = (e.clientX - rect.left) / rect.width
-  const time = percent * props.duration
-  emit('seek', time)
-}
-
-const onProgressHover = (e: MouseEvent) => {
-  const target = e.currentTarget as HTMLElement
-  const rect = target.getBoundingClientRect()
-  const percent = (e.clientX - rect.left) / rect.width
-  hoverPercent.value = percent * 100
-  hoverTime.value = percent * props.duration
-}
-
-const onVolumeInput = (e: Event) => {
-  const value = parseFloat((e.target as HTMLInputElement).value)
-  emit('volume-change', value)
-}
-
-const selectSpeed = (rate: number) => {
-  emit('rate-change', rate)
-  showSpeedMenu.value = false
-}
+const progressBackground = computed(() => {
+  const percent = props.duration ? (props.currentTime / props.duration) * 100 : 0;
+  return `linear-gradient(90deg, #de698c ${percent}%, #4c4c4c ${percent}%)`;
+});
 </script>
 
 <style scoped>
-.player-controls {
+.controls {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+.play-button {
+  position: absolute;
+  right: 12px;
+  bottom: 56px;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+.control-bar {
   position: absolute;
   bottom: 0;
-  left: 0;
-  right: 0;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
-  padding: 40px 16px 16px;
-  opacity: 0;
-  transition: opacity 0.3s;
-}
-
-.player-controls.show-always,
-.video-player:hover .player-controls {
-  opacity: 1;
-}
-
-.progress-bar {
-  position: relative;
-  height: 4px;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 2px;
-  margin-bottom: 12px;
-  cursor: pointer;
-}
-
-.progress-bar:hover {
-  height: 6px;
-}
-
-.progress-bg,
-.progress-buffer,
-.progress-current {
-  position: absolute;
-  top: 0;
-  left: 0;
-  height: 100%;
-  border-radius: inherit;
-}
-
-.progress-bg {
   width: 100%;
-  background: rgba(255, 255, 255, 0.2);
-}
-
-.progress-buffer {
-  background: rgba(255, 255, 255, 0.4);
-}
-
-.progress-current {
-  background: #fb7299;
-}
-
-.progress-handle {
-  position: absolute;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  width: 12px;
-  height: 12px;
-  background: #fb7299;
-  border-radius: 50%;
-  opacity: 0;
-  transition: opacity 0.2s;
-}
-
-.progress-bar:hover .progress-handle {
-  opacity: 1;
-}
-
-.progress-tooltip {
-  position: absolute;
-  bottom: 16px;
-  transform: translateX(-50%);
-  background: rgba(0, 0, 0, 0.8);
-  color: white;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 12px;
-  white-space: nowrap;
-}
-
-.controls-row {
+  height: 44px;
+  background-color: rgba(0, 0, 0, 0.5);
   display: flex;
-  justify-content: space-between;
   align-items: center;
 }
 
-.controls-left,
-.controls-right {
+.left {
+  display: inline-flex;
+  align-items: center;
+  color: #fff;
+  font-size: 12px;
+  margin-left: 12px;
+  gap: 4px;
+}
+
+.time,
+.total-duration {
+  width: 50px;
+}
+
+.time {
+  text-align: right;
+}
+
+.split {
+  width: 10px;
+  text-align: center;
+}
+
+.total-duration {
+  text-align: left;
+}
+
+.center {
+  position: absolute;
+  left: 108px;
+  right: 108px;
+  height: 10px;
+}
+
+.progress-wrapper {
+  position: relative;
+  height: 100%;
+}
+
+.progress-wrapper input[type='range'] {
+  width: 100%;
+  height: 100%;
+  appearance: none;
+  background: #4c4c4c;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.progress-wrapper input[type='range']::-webkit-slider-thumb {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.6);
+}
+
+.progress-wrapper input[type='range']::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  border: none;
+}
+
+.right {
+  margin-left: auto;
+  margin-right: 12px;
   display: flex;
   align-items: center;
   gap: 12px;
 }
 
-.control-btn {
-  background: none;
-  border: none;
-  color: white;
-  cursor: pointer;
-  padding: 6px;
+.barrage,
+.fullscreen {
+  height: 24px;
+  padding: 0 8px;
   border-radius: 4px;
-  transition: background 0.2s, color 0.2s;
+  color: #fff;
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.barrage.off {
+  opacity: 0.6;
+}
+
+.volume {
   display: flex;
   align-items: center;
-  justify-content: center;
+  gap: 6px;
 }
 
-.control-btn:hover {
-  background: rgba(255, 255, 255, 0.15);
+.volume-btn {
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 4px;
+  color: #fff;
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.12);
 }
 
-.control-btn.active {
-  color: #fb7299;
+.volume input[type='range'] {
+  width: 70px;
+  height: 4px;
+  appearance: none;
+  border-radius: 999px;
+  background: #4c4c4c;
 }
 
-.time-display {
-  color: white;
-  font-size: 13px;
-  font-variant-numeric: tabular-nums;
-}
-
-.volume-control {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.volume-slider {
-  position: absolute;
-  bottom: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 12px 8px;
-  background: rgba(0, 0, 0, 0.8);
-  border-radius: 8px;
-}
-
-.volume-slider input {
-  width: 20px;
-  height: 80px;
-  writing-mode: bt-lr;
-  -webkit-appearance: slider-vertical;
-}
-
-.speed-selector {
-  position: relative;
-}
-
-.speed-btn {
-  font-size: 13px;
-  min-width: 40px;
-}
-
-.speed-menu {
-  position: absolute;
-  bottom: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(0, 0, 0, 0.9);
-  border-radius: 8px;
-  padding: 8px 0;
-  min-width: 80px;
-  margin-bottom: 8px;
-}
-
-.speed-option {
-  padding: 8px 16px;
-  color: white;
-  font-size: 13px;
-  cursor: pointer;
-  text-align: center;
-  transition: background 0.2s;
-}
-
-.speed-option:hover {
-  background: rgba(251, 114, 153, 0.3);
-}
-
-.speed-option.active {
-  color: #fb7299;
-  background: rgba(251, 114, 153, 0.2);
+.volume input[type='range']::-webkit-slider-thumb {
+  appearance: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #fff;
 }
 </style>

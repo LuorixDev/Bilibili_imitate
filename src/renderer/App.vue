@@ -1,56 +1,55 @@
 <template>
-  <div id="app">
-    <HeaderBar />
-    <div class="main-container">
-      <SideMenu />
-      <main class="content">
-        <RouterView />
+  <div v-if="isPlayerRoute" class="player-shell">
+    <RouterView v-slot="{ Component }">
+      <Transition name="fade" mode="out-in">
+        <component :is="Component" />
+      </Transition>
+    </RouterView>
+  </div>
+  <div v-else class="app">
+    <SideMenu class="sidebar app-region" />
+    <div class="right-panel">
+      <HeaderBar class="app-region" />
+      <main ref="mainRef" class="main">
+        <RouterView v-slot="{ Component }">
+          <Transition name="fade" mode="out-in">
+            <component :is="Component" />
+          </Transition>
+        </RouterView>
+        <button v-show="showBackToTop" class="backtoTop no-app-region" @click="scrollToTop">
+          <BaseIcon name="up" :size="18" />
+        </button>
       </main>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import HeaderBar from './components/HeaderBar.vue'
-import SideMenu from './components/SideMenu.vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { useRoute } from 'vue-router';
+import HeaderBar from './components/HeaderBar.vue';
+import SideMenu from './components/SideMenu.vue';
+import BaseIcon from './components/BaseIcon.vue';
+
+const route = useRoute();
+const isPlayerRoute = computed(() => route.name === 'video' || route.name === 'live-detail');
+
+const mainRef = ref<HTMLElement | null>(null);
+const showBackToTop = ref(false);
+
+const onScroll = () => {
+  showBackToTop.value = (mainRef.value?.scrollTop || 0) > 400;
+};
+
+const scrollToTop = () => {
+  mainRef.value?.scrollTo({ top: 0, behavior: 'smooth' });
+};
+
+onMounted(() => {
+  mainRef.value?.addEventListener('scroll', onScroll);
+});
+
+onUnmounted(() => {
+  mainRef.value?.removeEventListener('scroll', onScroll);
+});
 </script>
-
-<style>
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-  background: #f1f2f3;
-  color: #18191c;
-}
-
-#app {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-}
-
-.main-container {
-  display: flex;
-  flex: 1;
-  padding-top: 64px;
-}
-
-.content {
-  flex: 1;
-  margin-left: 200px;
-  padding: 20px;
-  min-height: calc(100vh - 64px);
-}
-
-@media (max-width: 768px) {
-  .content {
-    margin-left: 0;
-    padding: 10px;
-  }
-}
-</style>
