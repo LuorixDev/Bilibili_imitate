@@ -1,32 +1,80 @@
-// src/renderer/stores/video.ts
+import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
-import type { Video } from '@/mock/types'
-import { createMockDB } from '@/mock'
-import logger from '@/core/logger'
+import type { Video, VideoDetail } from '../types'
+import { videoApi } from '../api/videoApi'
 
 export const useVideoStore = defineStore('video', () => {
-  const videos = ref<Video[]>([])
+  // State
+  const videoList = ref<Video[]>([])
+  const currentVideo = ref<VideoDetail | null>(null)
+  const loading = ref(false)
+  const hasMore = ref(true)
+  const page = ref(1)
+  const pageSize = 20
 
-  async function fetchVideos() {
+  // Getters
+  const recommendations = computed(() => 
+    videoList.value.filter(v => v.id !== currentVideo.value?.id).slice(0, 10)
+  )
+
+  // Actions
+  const fetchVideos = async (refresh = false) => {
+    if (loading.value) return
+    
+    loading.value = true
     try {
-      logger.info('Fetching videos from mock DB...')
-      // In a real app, this would be an API call.
-      // We simulate a network delay.
-      await new Promise((resolve) => setTimeout(resolve, 500))
-
-      const db = createMockDB(25)
-      videos.value = db.videos
-
-      logger.info(`Successfully fetched ${db.videos.length} videos.`)
-    } catch (error) {
-      logger.error('Failed to fetch videos:', error)
-      // Here you could set an error state
+      if (refresh) {
+        page.value = 1
+        videoList.value = []
+      }
+      
+      const res = await videoApi.getRecommendVideos(page.value, pageSize)
+      
+      if (res.data.length < pageSize) {
+        hasMore.value = false
+      }
+      
+      videoList.value.push(...res.data)
+      page.value++
+    } finally {
+      loading.value = false
     }
   }
 
+  const fetchVideoDetail = async (id: string) => {
+    loading.value = true
+    try {
+      const res = await videoApi.getVideoDetail(id)
+      currentVideo.value = res.data
+      return res.data
+    } finally {
+      loading.value = false
+    }
+  }
+
+  const searchVideos = async (keyword: string) => {
+    loading.value = true
+    try {
+      const res = await videoApi.searchVideos(keyword)
+      return res.data
+    } finally {
+      loading.value = false
+    }
+  }
+
+  const clearCurrentVideo = () => {
+    currentVideo.value = null
+  }
+
   return {
-    videos,
+    videoList,
+    currentVideo,
+    loading,
+    hasMore,
+    recommendations,
     fetchVideos,
+    fetchVideoDetail,
+    searchVideos,
+    clearCurrentVideo
   }
 })

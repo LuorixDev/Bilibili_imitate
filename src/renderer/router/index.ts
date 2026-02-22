@@ -1,40 +1,37 @@
-// src/renderer/router/index.ts
+import { createRouter, createWebHashHistory } from 'vue-router'
+import type { RouteRecordRaw } from 'vue-router'
 
-import { createRouter, createWebHashHistory, type RouteRecordRaw } from 'vue-router'
-import HomeView from '@/views/HomeView.vue'
-import VideoDetailView from '@/views/VideoDetailView.vue'
-
-const routes: Array<RouteRecordRaw> = [
+const routes: RouteRecordRaw[] = [
   {
     path: '/',
-    name: 'home',
-    component: HomeView,
+    name: 'Home',
+    component: () => import('../views/HomeView.vue')
   },
   {
     path: '/video/:id',
-    name: 'video',
-    component: VideoDetailView,
+    name: 'Video',
+    component: () => import('../views/VideoView.vue')
   },
   {
     path: '/search',
-    name: 'search',
-    component: HomeView, // Placeholder
+    name: 'Search',
+    component: () => import('../views/SearchView.vue')
+  },
+  {
+    path: '/user/:id?',
+    name: 'User',
+    component: () => import('../views/UserView.vue')
   },
   {
     path: '/history',
-    name: 'history',
-    component: HomeView, // Placeholder
-  },
-  {
-    path: '/space/:id',
-    name: 'space',
-    component: HomeView, // Placeholder
-  },
+    name: 'History',
+    component: () => import('../views/HistoryView.vue')
+  }
 ]
 
 const router = createRouter({
   history: createWebHashHistory(),
-  routes,
+  routes
 })
 
 export default router

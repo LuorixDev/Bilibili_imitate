@@ -1,93 +1,154 @@
 <template>
   <div class="home-view">
-    <h1>{{ t('home.title') }}</h1>
-    <p>{{ t('home.description') }}</p>
-
-    <div class="controls">
-      <!-- Theme switcher -->
-      <button @click="toggleTheme">{{ t('home.toggle_theme') }}: {{ theme }}</button>
-
-      <!-- Language switcher -->
-      <div class="language-switcher">
-        <span>{{ t('home.change_language') }}:</span>
-        <button @click="setLanguage('en')" :class="{ active: locale === 'en' }">EN</button>
-        <button @click="setLanguage('zh-CN')" :class="{ active: locale === 'zh-CN' }">中</button>
+    <!-- Banner -->
+    <div class="banner">
+      <div class="banner-content">
+        <h1>发现精彩视频</h1>
+        <p>探索无限可能的世界</p>
       </div>
     </div>
 
-    <div class="video-list">
-      <div v-if="isLoading" class="loading-state">
-        <p>Loading videos...</p>
-      </div>
-      <div v-else-if="videos.length" class="video-grid">
-        <VideoCard v-for="video in videos" :key="video.id" :video="video" />
-      </div>
-      <div v-else class="empty-state">
-        <p>No videos found.</p>
-      </div>
+    <!-- 分类标签 -->
+    <div class="category-tabs">
+      <button
+        v-for="cat in categories"
+        :key="cat"
+        class="tab-btn"
+        :class="{ active: currentCategory === cat }"
+        @click="currentCategory = cat"
+      >
+        {{ cat }}
+      </button>
+    </div>
+
+    <!-- 视频网格 -->
+    <div class="video-grid">
+      <VideoCard
+        v-for="video in filteredVideos"
+        :key="video.id"
+        :video="video"
+        @click="goToVideo(video)"
+      />
+    </div>
+
+    <!-- 加载更多 -->
+    <div class="load-more">
+      <button v-if="videoStore.hasMore" class="load-btn" @click="loadMore">
+        {{ videoStore.loading ? '加载中...' : '加载更多' }}
+      </button>
+      <span v-else class="no-more">没有更多了</span>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { useTheme } from '@/composables/useTheme'
-import { useI18n } from 'vue-i18n'
-import { useVideos } from '@/composables/useVideos'
-import VideoCard from '@/components/VideoCard.vue'
+import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { useVideoStore } from '../stores/video'
+import type { Video } from '../types'
+import VideoCard from '../components/VideoCard.vue'
 
-// --- i18n ---
-const { t, locale } = useI18n()
-const setLanguage = (lang: string) => {
-  locale.value = lang
+const router = useRouter()
+const videoStore = useVideoStore()
+
+const categories = ['推荐', '动画', '音乐', '舞蹈', '游戏', '科技', '生活', '娱乐']
+const currentCategory = ref('推荐')
+
+const filteredVideos = computed(() => {
+  if (currentCategory.value === '推荐') {
+    return videoStore.videoList
+  }
+  return videoStore.videoList.filter(v => v.category === currentCategory.value)
+})
+
+const goToVideo = (video: Video) => {
+  router.push(`/video/${video.id}`)
 }
 
-// --- Theme ---
-const { theme, toggleTheme } = useTheme()
+const loadMore = () => {
+  videoStore.fetchVideos()
+}
 
-// --- Videos ---
-const { videos, isLoading } = useVideos()
+onMounted(() => {
+  videoStore.fetchVideos(true)
+})
 </script>
 
 <style scoped>
 .home-view {
-  padding: 2rem;
-  text-align: center;
+  padding: 20px;
 }
 
-.controls {
+.banner {
+  background: linear-gradient(135deg, #FB7299 0%, #FF8F9F 100%);
+  border-radius: 16px;
+  padding: 48px;
+  margin-bottom: 24px;
+  color: #fff;
+}
+
+.banner-content h1 {
+  font-size: 32px;
+  margin-bottom: 12px;
+}
+
+.banner-content p {
+  font-size: 16px;
+  opacity: 0.9;
+}
+
+.category-tabs {
   display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 2rem;
-  margin-top: 2rem;
+  gap: 12px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
 }
 
-.language-switcher {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
+.tab-btn {
+  padding: 8px 20px;
+  border-radius: 20px;
+  border: none;
+  background: #f1f2f3;
+  color: #61666d;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
 }
 
-.language-switcher button.active {
-  border-color: #646cff;
-  font-weight: bold;
-}
-
-.video-list {
-  margin-top: 2rem;
+.tab-btn:hover,
+.tab-btn.active {
+  background: #FB7299;
+  color: #fff;
 }
 
 .video-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 1.5rem;
-  padding: 0 2rem;
-  justify-content: center;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
 }
 
-.loading-state,
-.empty-state {
-  margin-top: 4rem;
-  color: #888;
+.load-more {
+  text-align: center;
+  padding: 40px;
+}
+
+.load-btn {
+  padding: 12px 48px;
+  border: 1px solid #e3e5e7;
+  border-radius: 8px;
+  background: #fff;
+  color: #61666d;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.load-btn:hover {
+  border-color: #FB7299;
+  color: #FB7299;
+}
+
+.no-more {
+  color: #9499a0;
+  font-size: 14px;
 }
 </style>
